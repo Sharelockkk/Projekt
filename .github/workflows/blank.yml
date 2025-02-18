@@ -1,136 +1,4 @@
 using System;
-using System.Data.SQLite;
-
-namespace BankomatApp
-{
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            Bankomat bankomat = new Bankomat();
-            bankomat.Run();
-        }
-    }
-
-    class Bankomat
-    {
-        private Konto konto;
-        private const string connectionString = "Data Source=baza.db;Version=3;";
-
-        public Bankomat()
-        {
-            konto = new Konto(connectionString);
-        }
-
-        public void Run()
-        {
-            while (true)
-            {
-                Console.WriteLine("1. Sprawdź saldo
-2. Wpłać
-3. Wypłać
-4. Wyjdź");
-                string wybor = Console.ReadLine();
-
-                switch (wybor)
-                {
-                    case "1":
-                        Console.WriteLine($"Twoje saldo: {konto.PobierzSaldo()} PLN");
-                        break;
-                    case "2":
-                        Console.Write("Podaj kwotę wpłaty: ");
-                        decimal wplata = Convert.ToDecimal(Console.ReadLine());
-                        konto.Wplac(wplata);
-                        break;
-                    case "3":
-                        Console.Write("Podaj kwotę wypłaty: ");
-                        decimal wyplata = Convert.ToDecimal(Console.ReadLine());
-                        konto.Wyplac(wyplata);
-                        break;
-                    case "4":
-                        return;
-                    default:
-                        Console.WriteLine("Niepoprawny wybór.");
-                        break;
-                }
-            }
-        }
-    }
-
-    class Konto
-    {
-        private string connectionString;
-
-        public Konto(string connectionString)
-        {
-            this.connectionString = connectionString;
-            InicjalizujBaze();
-        }
-
-        private void InicjalizujBaze()
-        {
-            using (var conn = new SQLiteConnection(connectionString))
-            {
-                conn.Open();
-                string query = "CREATE TABLE IF NOT EXISTS Konta (Id INTEGER PRIMARY KEY AUTOINCREMENT, Imie TEXT, Nazwisko TEXT, Saldo DECIMAL(10,2) DEFAULT 1000.00);";
-                using (var cmd = new SQLiteCommand(query, conn))
-                {
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-
-        public decimal PobierzSaldo()
-        {
-            using (var conn = new SQLiteConnection(connectionString))
-            {
-                conn.Open();
-                string query = "SELECT Saldo FROM Konta WHERE Id = 1;";
-                using (var cmd = new SQLiteCommand(query, conn))
-                {
-                    object result = cmd.ExecuteScalar();
-                    return result != null ? Convert.ToDecimal(result) : 1000m;
-                }
-            }
-        }
-
-        public void Wplac(decimal kwota)
-        {
-            AktualizujSaldo(kwota);
-            Console.WriteLine($"Wpłacono {kwota} PLN.");
-        }
-
-        public void Wyplac(decimal kwota)
-        {
-            decimal saldo = PobierzSaldo();
-            if (saldo >= kwota)
-            {
-                AktualizujSaldo(-kwota);
-                Console.WriteLine($"Wypłacono {kwota} PLN.");
-            }
-            else
-            {
-                Console.WriteLine("Niewystarczające środki na koncie!");
-            }
-        }
-
-        private void AktualizujSaldo(decimal kwota)
-        {
-            using (var conn = new SQLiteConnection(connectionString))
-            {
-                conn.Open();
-                string query = "UPDATE Konta SET Saldo = Saldo + @kwota WHERE Id = 1;";
-                using (var cmd = new SQLiteCommand(query, conn))
-                {
-                    cmd.Parameters.AddWithValue("@kwota", kwota);
-                    cmd.ExecuteNonQuery();
-                }
-            }
-        }
-    }
-}
-using System;
-using System.Collections.Generic;
 using System.IO;
 
 namespace BankomatApp
@@ -158,7 +26,8 @@ namespace BankomatApp
         {
             while (true)
             {
-                Console.WriteLine("1. Sprawdź saldo\n2. Wpłać\n3. Wypłać\n4. Wyjdź");
+                Console.WriteLine("\n1. Sprawdź saldo\n2. Wpłać\n3. Wypłać\n4. Wyjdź");
+                Console.Write("Wybierz opcję: ");
                 string wybor = Console.ReadLine();
 
                 switch (wybor)
@@ -168,18 +37,31 @@ namespace BankomatApp
                         break;
                     case "2":
                         Console.Write("Podaj kwotę wpłaty: ");
-                        decimal wplata = Convert.ToDecimal(Console.ReadLine());
-                        konto.Wplac(wplata);
+                        if (decimal.TryParse(Console.ReadLine(), out decimal wplata) && wplata > 0)
+                        {
+                            konto.Wplac(wplata);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Błąd: niepoprawna kwota.");
+                        }
                         break;
                     case "3":
                         Console.Write("Podaj kwotę wypłaty: ");
-                        decimal wyplata = Convert.ToDecimal(Console.ReadLine());
-                        konto.Wyplac(wyplata);
+                        if (decimal.TryParse(Console.ReadLine(), out decimal wyplata) && wyplata > 0)
+                        {
+                            konto.Wyplac(wyplata);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Błąd: niepoprawna kwota.");
+                        }
                         break;
                     case "4":
+                        Console.WriteLine("Dziękujemy za skorzystanie z bankomatu.");
                         return;
                     default:
-                        Console.WriteLine("Niepoprawny wybór.");
+                        Console.WriteLine("Niepoprawny wybór. Spróbuj ponownie.");
                         break;
                 }
             }
@@ -214,7 +96,7 @@ namespace BankomatApp
             }
             else
             {
-                Console.WriteLine("Niewystarczające środki na koncie!");
+                Console.WriteLine("Błąd: Niewystarczające środki na koncie!");
             }
         }
 
@@ -223,8 +105,16 @@ namespace BankomatApp
             if (File.Exists(plik))
             {
                 string zawartosc = File.ReadAllText(plik);
-                decimal.TryParse(zawartosc, out decimal saldo);
-                Saldo = saldo;
+                if (decimal.TryParse(zawartosc, out decimal saldo))
+                {
+                    Saldo = saldo;
+                }
+                else
+                {
+                    Console.WriteLine("Błąd: Niepoprawna zawartość pliku bazy. Resetowanie salda do 1000 PLN.");
+                    Saldo = 1000m;
+                    ZapiszSaldo();
+                }
             }
             else
             {
